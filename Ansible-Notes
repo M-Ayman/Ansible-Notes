@@ -1,0 +1,223 @@
+# man ansible-doc
+#ansible-doc -l 	#andible-doc ec2
+-----------------------------------
+	test environment setup
+#adduser test # mkdir playbooks #chown 
+#su - test #ssh-kegen #ssh-copy-id master-to-nodes
+#install epel-release ansible
+----------------------------------
+	-ansible configuration file
+# yum list installed | grep python
+
+/etc/ansible/hosts
+
+# ansible all --list-hosts
+# ansible local"group in host" -m ping 
+# ansible webserver -i path/to/hosts -m ping %override default
+
+-the user test will be own its ansible.config,hosts
+# export ANSIBLE_CONFIG=/home/test/config/ansible.cfg
+# set | grep ANSIBLE
+-OVERRIDE ROLES
+-----------------------------------------
+		-ansible playbooks
+	-ansible account
+-no asking password for user test 
+test ALL=NOPASSWD: ALL
+-copy key to localhost,any point to localhost
+----------------------------------------
+	-ansible command line
+# ansible all --list-hosts
+# ansible web --list-hosts
+# ansible local -s -m shell -a "yum list installed | grep python"
+--------------------------------------
+	-system facts
+# ansible local -m setup | more
+# ansible local -m setup --tree /tmp/facts
+# ansible local -m setup -a 'filter=*ipv4*'
+# ansible local -m setup -a 'filter=ansible_distriubtion'
+-------------------
+	-first playbook
+# ansible local -s -m apt -a 'pkg=lynx state=installed update_cache=true'
+
+#mkdir Playbooks  #vim webapp.yml
+#ansible-playbook -s webapp.yml
+--------------------------------------
+	-variables
+ vars:
+  root_dir: /var/www/html
+-create vars.yml that contain all vars and include it in my playbook
+ vars_files:
+ - vars.yml
+------------------------------------------------
+	-target section
+-handlers=notify to make action eg:install apache then restart 
+-make sure the in notify = name of handler section
+-outline playbook
+
+# ansible-playbook local target.yml --check %called dry run
+
+-Asynchronous Actions and Polling
+ async: 300 #waiting 300s to run commands
+ pool: 5
+
+-variable substituation
+ {{ pkage_name }}
+
+-lookup function
+-RUNONCE
+ run_once: true
+
+-local actions
+  - hosts: 127.0.0.1
+    connection: local
+ u can pass connection=local when run
+
+-loops
+
+-conditionals....when,until
+
+-Notify
+------------------------------------
+-valut: to encrypt yml files
+	# ansible-valut create secure.yml
+	# ansible-valut edit secure.yml
+	#		rekey,decrypt
+	now the scenario is we have accounts.yml that contain :
+	user: admin
+	password: admin
+	
+	# asnible-valut encrypt accounts.yml secure.yml
+	-to run playbook use --ask-vault-pass, or file
+-------------------------------------------
+-prompt: interactive playbook
+prompt.yml
+  vars_prompt:
+    - name: pkgprompot
+      prompt: Install which packge?
+      default: telnet
+      private: no
+  tasks:
+    - name: install pakage from prompt
+      yum: pkg={{ pkgprompot }} state=latest
+
+---------------------------------------------------
+-include statement: to break tasks 
+	tasks:
+  	   - include: plays/pkages.yml
+----------------------------------------------------
+
+
+==================================
+		-modules
+	-setup module
+# ansible local -m setup -a 'filter=ansible_architecture'
+-ansible_distribution
+
+#asnible local -m setup | grep distribution
+------------------------------------------
+	-file module
+# ansible local -m file -a 'path=/etc/fstab'
+# ansible local -s -m file -a 'path=/tmp/aymoon state=directory mode=0700 owner=root'
+--------------------------------------
+	-pause module
+tasks:
+    - name: remove nginx
+      action: apt name=nginx state=absent
+    - name: pausing
+      pause:
+        prompt: is removing complete?
+    - name: install lynx
+      action: apt name=lynx state=present
+
+-or u can use seconds: 5 instead of prompt
+-----------------------------------------
+	-wait module
+-means don't do next action until port 8080 started
+ wait_for:
+   port: 8080
+   state: started
+- name:jjjj
+  action: x.x.x.    
+---------------------------------
+	-yum,apt module
+action: yum name=* state=latest  %any pakage on os will be latest
+
+apt: update_cache=yes  %= updat
+apt: update
+--------------------------------
+	-service module
+service: name= state=started enabled=yes
+--------------------------------
+	-jinjia2 template
+-python extention
+files/test.conf.j2  %contain substuation vars
+files/test.yml    %contain values of vars
+template: src= dest= owner= group= mode=
+--------------------------------
+	-complete module
+
+
+
+
+
+============================================
+		-Roles
+	-roles structure
+../Roles/roles/common/{webservers,appservers,caching} dire
+
+	-role baseed tasks,task order"pre and post"
+pre_tasks:
+
+roles:
+  - webservers
+
+post_tasks:
+
+
+	-conditional exwcution
+ install httpd
+ when: "ansible_os_family == 'RedHat'"
+ ignore_errors: yes
+
+
+	-var susbstituation,roles-handler,notifications
+---------------------------------------------------
+	-configuring alternate roles paths
+# cp webservers.yml /home/test/
+# ansible-playbook --check webservers.yml %error not found roles 
+%solution
+/etc/ansible/ansible.cfg
+roles_path     = /home/test/playbooks/Roles/roles/
+--------------------------------------------------
+	-conditional include statements
+# mkdir red-hat-only,debian-only
+# cp webserver.yml redhat.yml,debian.yml
+
+-to include both two roles with condition on master playbook webserver.yml
+
+  roles:
+  - { role: red-hat-only when "ansible_os_family== 'RedHat'" }
+   - { role: debian-only when "ansible_os_family== 'Debian'" }
+------------------------------------------------------
+	-wait for events
+-require to start the service manually
+
+	-Breaking a playbook into a role 
+pre_tasks,post_tasks
+
+
+	-passing vars from command line
+ hosts: {{ hosts }}
+ user: {{ users_name }}
+#ansible-playbook --extra-vars "hosts=local users_name=test"
+----------------------------------------------------
+	delgateto(&local action
+If you want to perform a task on one host with reference to other hosts, use the ‘delegate_to’ keyword on a task. 
+
+A common pattern is to use a local action to call ‘rsync’ to recursively copy files to the managed servers. Here is an example:
+ tasks:
+
+  - name: recursively copy files from management server to target
+    local_action: command rsync -a /path/to/files {{ inventory_hostname }}:/path/to/target/
+-------------------------------
